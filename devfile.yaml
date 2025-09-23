@@ -1,0 +1,62 @@
+apiVersion: 1.0.0
+metadata:
+  name: quarkus-openshift-workspace
+  version: 0.1.0
+  attributes:
+    # Kubernetes resources can be added later if you want to deploy automatically
+    quarkus/dev-mode: "true"
+projects:
+  - name: quarkus-openshift
+    git:
+      # replace with your repo URL
+      location: "https://github.com/NateLove/quarkus-openshift.git"
+      branch: "main"
+    clonePath: /projects/quarkus-openshift
+
+components:
+  - name: maven
+    container:
+      image: quay.io/devspaces/udi-rhel8:latest
+      memoryLimit: "2Gi"
+      mountSources: true
+      workdir: /projects/quarkus-openshift
+      env:
+        - name: MAVEN_OPTS
+          value: "-Xmx1G"
+      commands:
+        - name: build
+          command: ["sh", "-c"]
+          args: ["./mvnw package"]
+        - name: dev
+          command: ["sh", "-c"]
+          args: ["./mvnw quarkus:dev"]
+    endpoints:
+      - name: quarkus-http
+        targetPort: 8080
+        protocol: http
+        exposure: internal
+
+  - name: runtime
+    container:
+      image: quay.io/devspaces/udi-rhel8:latest
+      memoryLimit: "1Gi"
+      mountSources: false
+      workdir: /projects/quarkus-openshift
+      commands:
+        - name: run
+          command: ["sh", "-c"]
+          args: ["java -jar target/quarkus-app/quarkus-run.jar"]
+    endpoints:
+      - name: http
+        targetPort: 8080
+        protocol: http
+        exposure: public
+
+commands:
+  - name: build-and-run
+    component: maven
+    risingIf: "true"
+    after:
+      - build
+      - dev
+
